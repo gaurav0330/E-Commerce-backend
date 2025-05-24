@@ -1,10 +1,36 @@
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs').promises;
+
+// Function to ensure uploads directory exists
+const ensureUploadsDir = async () => {
+  const uploadsDir = path.join(__dirname, 'uploads');
+  try {
+    await fs.access(uploadsDir);
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      console.log('Creating uploads directory...');
+      await fs.mkdir(uploadsDir, { recursive: true });
+    } else {
+      throw error;
+    }
+  }
+};
+
+// Initialize the uploads directory when this module is loaded
+ensureUploadsDir().catch(err => {
+  console.error('Failed to create uploads directory:', err);
+});
 
 // Storage configuration for datasets
 const datasetStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, 'uploads/');
+  destination: async (req, file, cb) => {
+    try {
+      await ensureUploadsDir();
+      cb(null, 'uploads/');
+    } catch (error) {
+      cb(error, null);
+    }
   },
   filename: (req, file, cb) => {
     cb(null, Date.now() + '-' + file.originalname);
@@ -29,8 +55,13 @@ const uploadDatasetM = multer({
 
 // Storage configuration for images
 const imageStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, 'uploads/');
+  destination: async (req, file, cb) => {
+    try {
+      await ensureUploadsDir();
+      cb(null, 'uploads/');
+    } catch (error) {
+      cb(error, null);
+    }
   },
   filename: (req, file, cb) => {
     cb(null, Date.now() + '-' + file.originalname);
