@@ -2,9 +2,9 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs').promises;
 
-// Function to ensure uploads directory exists
+// Ensure the uploads directory exists
 const ensureUploadsDir = async () => {
-  const uploadsDir = path.join(__dirname, 'uploads');
+  const uploadsDir = path.join(__dirname, '..', 'uploads');
   try {
     await fs.access(uploadsDir);
   } catch (error) {
@@ -17,11 +17,6 @@ const ensureUploadsDir = async () => {
   }
 };
 
-// Initialize the uploads directory when this module is loaded
-ensureUploadsDir().catch(err => {
-  console.error('Failed to create uploads directory:', err);
-});
-
 // Storage configuration for datasets
 const datasetStorage = multer.diskStorage({
   destination: async (req, file, cb) => {
@@ -29,7 +24,7 @@ const datasetStorage = multer.diskStorage({
       await ensureUploadsDir();
       cb(null, 'uploads/');
     } catch (error) {
-      cb(error, null);
+      cb(error);
     }
   },
   filename: (req, file, cb) => {
@@ -60,7 +55,7 @@ const imageStorage = multer.diskStorage({
       await ensureUploadsDir();
       cb(null, 'uploads/');
     } catch (error) {
-      cb(error, null);
+      cb(error);
     }
   },
   filename: (req, file, cb) => {
