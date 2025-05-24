@@ -59,6 +59,22 @@ const addProduct = async (req, res) => {
   }
 };
 
+const getProductById = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    // Check if product exists and belongs to user
+    const product = await Product.findOne({ _id: id, user: req.user });
+    if (!product) {
+      return res.status(404).json({ message: 'Product not found or not authorized' });
+    }
+
+    res.status(200).json(product);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
 const updateProduct = async (req, res) => {
   const { id } = req.params;
   const { name, category, subCategory, promotion, competitors, price, stock, description, imageUrl, brand, ratings } = req.body;
@@ -155,4 +171,4 @@ const uploadDataset = async (req, res) => {
   }
 };
 
-module.exports = { getProducts, addProduct, updateProduct, uploadDataset ,deleteProduct};
+module.exports = { getProducts, addProduct, updateProduct, uploadDataset ,deleteProduct,getProductById};
