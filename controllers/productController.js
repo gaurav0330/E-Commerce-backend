@@ -1,6 +1,22 @@
 const Product = require('../models/Product');
 const cloudinary = require('../config/cloudinaryConfig');
 const fs = require('fs').promises; // For file system operations
+const path = require('path');
+
+// Ensure the uploads directory exists
+const ensureUploadsDir = async () => {
+  const uploadsDir = path.join(__dirname, '..', 'uploads');
+  try {
+    await fs.access(uploadsDir);
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      console.log('Creating uploads directory...');
+      await fs.mkdir(uploadsDir, { recursive: true });
+    } else {
+      throw error;
+    }
+  }
+};
 
 const getProducts = async (req, res) => {
   try {
@@ -11,11 +27,27 @@ const getProducts = async (req, res) => {
   }
 };
 
+const getProductById = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const product = await Product.findOne({ _id: id, user: req.user });
+    if (!product) {
+      return res.status(404).json({ message: 'Product not found or not authorized' });
+    }
+    res.status(200).json(product);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
 const addProduct = async (req, res) => {
   const { name, category, subCategory, price, stock, description, brand } = req.body;
 
   try {
-    // Validate required fields
+    // Ensure uploads directory exists
+    await ensureUploadsDir();
+
     if (!name || !category || !price || stock === undefined) {
       return res.status(400).json({ message: 'Name, category, price, and stock are required' });
     }
@@ -31,46 +63,37 @@ const addProduct = async (req, res) => {
       user: req.user,
     };
 
-    // Handle image upload to Cloudinary if provided
     if (req.file) {
+      console.log('File saved to:', req.file.path);
+      // Verify file exists before uploading
+      await fs.access(req.file.path);
+
       const result = await cloudinary.uploader.upload(req.file.path, {
         resource_type: 'image',
         folder: 'ecommerce-products',
       });
       productData.imageUrl = result.secure_url;
 
-      // Delete the temporary file from uploads/
-      await fs.unlink(req.file.path);
+      // Delete the temporary file
+      try {
+        await fs.unlink(req.file.path);
+        console.log('Temporary file deleted:', req.file.path);
+      } catch (unlinkError) {
+        console.error('Failed to delete temporary file:', unlinkError.message);
+      }
     }
 
     const product = new Product(productData);
     await product.save();
     res.status(201).json(product);
   } catch (error) {
-    // If there's an error, attempt to delete the file if it exists
     if (req.file) {
       try {
         await fs.unlink(req.file.path);
       } catch (cleanupError) {
-        console.error('Failed to delete temporary file:', cleanupError);
+        console.error('Failed to delete temporary file:', cleanupError.message);
       }
     }
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-};
-
-const getProductById = async (req, res) => {
-  const { id } = req.params;
-
-  try {
-    // Check if product exists and belongs to user
-    const product = await Product.findOne({ _id: id, user: req.user });
-    if (!product) {
-      return res.status(404).json({ message: 'Product not found or not authorized' });
-    }
-
-    res.status(200).json(product);
-  } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
@@ -80,13 +103,11 @@ const updateProduct = async (req, res) => {
   const { name, category, subCategory, promotion, competitors, price, stock, description, imageUrl, brand, ratings } = req.body;
 
   try {
-    // Check if product exists and belongs to user
     const product = await Product.findOne({ _id: id, user: req.user });
     if (!product) {
       return res.status(404).json({ message: 'Product not found or not authorized' });
     }
 
-    // Update fields
     if (name) product.name = name;
     if (category) product.category = category;
     if (subCategory) product.subCategory = subCategory;
@@ -110,15 +131,11 @@ const deleteProduct = async (req, res) => {
   const { id } = req.params;
 
   try {
-    // Check if product exists and belongs to user
     const product = await Product.findOne({ _id: id, user: req.user });
     if (!product) {
       return res.status(404).json({ message: 'Product not found or not authorized' });
     }
-
-    // Delete the product
     await Product.deleteOne({ _id: id });
-
     res.status(200).json({ message: 'Product deleted successfully', product });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -129,29 +146,41 @@ const uploadDataset = async (req, res) => {
   const { productId } = req.body;
 
   try {
-    // Check if product exists and belongs to user
+    // Ensure uploads directory exists
+    await ensureUploadsDir();
+
+    console.log('Upload Dataset Request:', { productId, file: req.file });
+
     const product = await Product.findOne({ _id: productId, user: req.user });
     if (!product) {
+      console.log('Product not found or not authorized:', { productId, user: req.user });
       return res.status(404).json({ message: 'Product not found or not authorized' });
     }
 
-    // Check if file is uploaded
     if (!req.file) {
+      console.log('No file uploaded');
       return res.status(400).json({ message: 'No file uploaded' });
     }
 
-    // Upload file to Cloudinary
+    console.log('File saved to:', req.file.path);
+    // Verify file exists before uploading
+    await fs.access(req.file.path);
+
+    console.log('Uploading file to Cloudinary:', req.file.path);
     const result = await cloudinary.uploader.upload(req.file.path, {
       resource_type: 'raw',
       folder: 'ecommerce-datasets',
     });
 
-    // Update product with dataset URL
     product.datasetUrl = result.secure_url;
     await product.save();
 
-    // Delete the temporary file from uploads/
-    await fs.unlink(req.file.path);
+    try {
+      await fs.unlink(req.file.path);
+      console.log('Temporary file deleted:', req.file.path);
+    } catch (unlinkError) {
+      console.error('Failed to delete temporary file:', unlinkError.message);
+    }
 
     res.status(200).json({
       message: 'Dataset uploaded successfully',
@@ -159,16 +188,16 @@ const uploadDataset = async (req, res) => {
       product,
     });
   } catch (error) {
-    // If there's an error, attempt to delete the file if it exists
+    console.error('Upload Dataset Error:', error.message, error.stack);
     if (req.file) {
       try {
         await fs.unlink(req.file.path);
       } catch (cleanupError) {
-        console.error('Failed to delete temporary file:', cleanupError);
+        console.error('Failed to delete temporary file:', cleanupError.message);
       }
     }
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
 
-module.exports = { getProducts, addProduct, updateProduct, uploadDataset ,deleteProduct,getProductById};
+module.exports = { getProducts, addProduct, updateProduct, uploadDataset, deleteProduct, getProductById };
