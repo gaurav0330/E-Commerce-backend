@@ -29,15 +29,15 @@ const getProductById = async (req, res) => {
 };
 
 const addProduct = async (req, res) => {
-  const { name, category, subCategory, price, stock, description, brand } = req.body;
+  const { product_name, category, subCategory, price, stock, description, brand } = req.body;
 
   try {
-    if (!name || !category || !price || stock === undefined) {
+    if (!product_name || !category || !price || stock === undefined) {
       return res.status(400).json({ message: 'Name, category, price, and stock are required' });
     }
 
     const productData = {
-      name,
+      product_name,
       category,
       subCategory,
       price,
@@ -118,7 +118,29 @@ const addProduct = async (req, res) => {
 
 const updateProduct = async (req, res) => {
   const { id } = req.params;
-  const { name, category, subCategory, promotion, competitors, price, stock, description, imageUrl, brand, ratings } = req.body;
+  const {
+    product_name,
+    category,
+    subCategory,
+    start_date,
+    end_date,
+    discount,
+    price,
+    stock,
+    description,
+    imageUrl,
+    brand,
+    ratings,
+    Dataset,
+    datasetUrl,
+    market_demand,
+    promotion,
+    historical_data,
+    seasonal_trends,
+    economic_indicators,
+    competitor_analysis,
+    predictions,
+  } = req.body;
 
   try {
     const product = await Product.findOne({ _id: id, user: req.user });
@@ -126,18 +148,34 @@ const updateProduct = async (req, res) => {
       return res.status(404).json({ message: 'Product not found or not authorized' });
     }
 
+    // Log promotion to debug
+    console.log('Received promotion:', JSON.stringify(req.body.promotion, null, 2));
+
     // Update fields only if provided
-    if (name !== undefined) product.name = name;
+    if (product_name !== undefined) product.product_name = product_name;
     if (category !== undefined) product.category = category;
     if (subCategory !== undefined) product.subCategory = subCategory;
-    if (promotion !== undefined) product.promotion = promotion;
-    if (competitors !== undefined) product.competitors = competitors;
+    if (start_date !== undefined) product.start_date = start_date;
+    if (end_date !== undefined) product.end_date = end_date;
+    if (discount !== undefined) product.discount = discount;
     if (price !== undefined) product.price = price;
     if (stock !== undefined) product.stock = stock;
     if (description !== undefined) product.description = description;
     if (imageUrl !== undefined) product.imageUrl = imageUrl;
     if (brand !== undefined) product.brand = brand;
     if (ratings !== undefined) product.ratings = ratings;
+    if (Dataset !== undefined) {
+      product.Dataset = Dataset;
+      product.markModified('Dataset');
+    }
+    if (datasetUrl !== undefined) product.datasetUrl = datasetUrl;
+    if (market_demand !== undefined) product.market_demand = market_demand;
+    if (promotion !== undefined) product.promotion = promotion;
+    if (historical_data !== undefined) product.historical_data = historical_data;
+    if (seasonal_trends !== undefined) product.seasonal_trends = seasonal_trends;
+    if (economic_indicators !== undefined) product.economic_indicators = economic_indicators;
+    if (competitor_analysis !== undefined) product.competitor_analysis = competitor_analysis;
+    if (predictions !== undefined) product.predictions = predictions;
 
     await product.save();
     res.status(200).json({ message: 'Product updated successfully', product });

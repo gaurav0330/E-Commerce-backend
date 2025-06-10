@@ -1,65 +1,42 @@
 const mongoose = require('mongoose');
 
+const promotionSchema = new mongoose.Schema({
+  datetime: Date,
+  type: String,
+}, { _id: false });
+
 const productSchema = new mongoose.Schema({
-  name: {
+  product_name: {
     type: String,
-    required: true,
+    required: false,
   },
   category: {
     type: String,
-    required: true,
+    required: false,
   },
   subCategory: {
     type: String,
     required: false,
   },
-  promotion: [
-    {
-      date: {
-        type: Date,
-        required: true,
-      },
-      duration: {
-        type: Number, // e.g., duration in days or hours
-        required: true,
-      },
-      area: {
-        type: String, // e.g., geographic area
-        required: true,
-      },
-      platform: {
-        type: String, // e.g., Amazon, eBay
-        required: true,
-      },
-    },
-  ],
-  competitors: [
-    {
-      price: {
-        type: Number,
-        required: true,
-      },
-      discount: {
-        type: Number, // e.g., percentage or amount
-        required: true,
-      },
-      sales: {
-        type: Number, // e.g., units sold
-        required: true,
-      },
-      marketShare: {
-        type: Number, // e.g., percentage
-        required: true,
-      },
-    },
-  ],
+  start_date: {
+    type: String,
+    required: false,
+  },
+  end_date: {
+    type: String,
+    required: false,
+  },
+  discount: {
+    type: Number,
+    required: false,
+  },
   price: {
     type: Number,
-    required: true,
+    required: false,
   },
   stock: {
     type: Number,
-    required: true,
+    required: false,
     default: 0,
   },
   description: {
@@ -97,6 +74,125 @@ const productSchema = new mongoose.Schema({
   datasetUrl: {
     type: String,
     default: '',
+  },
+  Dataset: {
+    type: mongoose.Schema.Types.Mixed,
+    required: false,
+    default: {},
+  },
+  market_demand: {
+    market_share: {
+      own: Number,
+      competitor: [
+        {
+          name: String,
+          share: Number,
+        },
+      ],
+    },
+    product_demand: {
+      '2018': [Number],
+      '2019': [Number],
+    },
+  },
+  promotion: {
+    Competitor_promotion_effect: {
+      type: Map,
+      of: Number,
+    },
+    Old_promotion: [ promotionSchema],
+    Upcoming_promotion: [promotionSchema],
+  },
+  historical_data: {
+    Ecommerce_platform_rating: [
+      {
+        month: String,
+        rating: Number,
+      },
+    ],
+    Price_changes: {
+      initial: Number,
+      old: [
+        {
+          datetime: Date,
+          price: Number,
+          discount: Number,
+        },
+      ],
+      upcoming: [
+        {
+          datetime: Date,
+          price: Number,
+          discount: Number,
+        },
+      ],
+    },
+    Old_dataset_url: [
+      {
+        Start: String,
+        End: String,
+        url: String,
+      },
+    ],
+  },
+  seasonal_trends: {
+    highest_demand_months: {
+      '2018': [Number],
+      '2019': [Number],
+    },
+  },
+  economic_indicators: {
+    gdp: {
+      '2018': [Number],
+      '2019': [Number],
+    },
+    unemployment_rate: {
+      '2018': [Number],
+      '2019': [Number],
+    },
+    inflation_rate: {
+      '2018': [Number],
+      '2019': [Number],
+    },
+    consumer_confidence_index: {
+      '2018': [Number],
+      '2019': [Number],
+    },
+    interest_rate: {
+      '2018': [Number],
+      '2019': [Number],
+    },
+    exchange_rate: {
+      '2018': [Number],
+      '2019': [Number],
+    },
+    stock_market_index: {
+      '2018': [Number],
+      '2019': [Number],
+    },
+  },
+  competitor_analysis: {
+    competitors: [
+      {
+        name: String,
+        market_share: Number,
+        price: Number,
+        product_demand: {
+          '2018': [Number],
+          '2019': [Number],
+        },
+      },
+    ],
+  },
+  predictions: {
+    accuracy: {
+      '2018': Number,
+      '2019': Number,
+    },
+    promotion_effect: {
+      '2018': Number,
+      '2019': Number,
+    },
   },
 });
 
