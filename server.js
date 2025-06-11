@@ -27,7 +27,7 @@ const generateCronToken = () => {
 };
 
 // Schedule task to append dummy data every 2 minutes
-cron.schedule('*/24 * * * *', async () => {
+cron.schedule('0 0 * * *', async () => {
   console.log('Running dummy data append task every 2 minutes...');
   try {
     const userId = '6830bc44f93ca72fcf59ad92';
