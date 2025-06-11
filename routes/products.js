@@ -5,7 +5,7 @@ const { getProducts, addProduct, uploadDataset, updateProduct, deleteProduct, ge
 const { uploadDatasetM, uploadImageM } = require('../middleware/multerConfig');
 
 router.get('/', protect, getProducts);
-router.get('/:id', protect, getProductById);
+router.get('/:id',getProductById);
 router.post('/', protect, uploadImageM.single('image'), addProduct);
 router.put('/:id', protect, updateProduct);
 router.delete('/:id', protect, deleteProduct);
