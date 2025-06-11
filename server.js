@@ -79,7 +79,7 @@ cron.schedule('*/2 * * * *', async () => {
 
 // Add environment variable validation
 const validateEnvironment = () => {
-  const requiredVars = ['JWT_SECRET', 'MONGODB_URI'];
+  const requiredVars = ['JWT_SECRET', 'MONGO_URI'];
   const missing = requiredVars.filter(varName => !process.env[varName]);
   
   if (missing.length > 0) {
