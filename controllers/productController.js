@@ -1,5 +1,5 @@
-const fsPromises = require('fs').promises; // For promise-based file operations
-const fs = require('fs'); // For stream-based operations
+const fsPromises = require('fs').promises;
+const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
 const { parse } = require('csv-parse');
@@ -7,6 +7,21 @@ const { stringify } = require('csv-stringify');
 const _ = require('lodash');
 const cloudinary = require('../config/cloudinaryConfig');
 const Product = require('../models/Product');
+
+// Ensure uploads directory exists
+const ensureUploadsDir = async () => {
+  const uploadsDir = path.join(__dirname, '..', 'uploads');
+  try {
+    await fsPromises.access(uploadsDir);
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      console.log('Creating uploads directory:', uploadsDir);
+      await fsPromises.mkdir(uploadsDir, { recursive: true });
+    } else {
+      throw error;
+    }
+  }
+};
 
 const getProducts = async (req, res) => {
   try {
@@ -54,7 +69,6 @@ const addProduct = async (req, res) => {
 
     if (req.file) {
       console.log('File received:', req.file.path);
-      
       try {
         await fsPromises.access(req.file.path);
         console.log('File verification successful');
@@ -267,67 +281,105 @@ const uploadDataset = async (req, res) => {
 };
 
 const appendDummyDataToProduct = async (productId, user) => {
+  let tempFilePath = null;
+  let updatedFilePath = null;
+
   try {
-    // Find the product
+    await ensureUploadsDir();
+
     const product = await Product.findOne({ _id: productId, user });
     if (!product || !product.datasetUrl) {
       throw new Error('Product or dataset not found');
     }
 
-    // Get 10 random records from dummy data
+    console.log(`Downloading dataset from: ${product.datasetUrl}`);
     const dummyData = await new Promise((resolve, reject) => {
       const data = [];
-      fs.createReadStream('./data.csv')
+      const csvPath = path.join(__dirname, '..', 'data.csv');
+      fs.createReadStream(csvPath)
         .pipe(parse({ columns: true }))
         .on('data', (row) => data.push(row))
-        .on('end', () => resolve(_.sampleSize(data, 10)))
-        .on('error', (err) => reject(err));
+        .on('end', () => {
+          console.log(`Read ${data.length} rows from data.csv`);
+          resolve(_.sampleSize(data, 10));
+        })
+        .on('error', (err) => {
+          console.error(`Error reading ${csvPath}:`, err.message);
+          reject(err);
+        });
     });
 
-    // Download existing dataset from Cloudinary
     const response = await axios.get(product.datasetUrl, { responseType: 'stream' });
-    const tempFilePath = path.join('uploads', `temp-${Date.now()}.csv`);
+    if (response.status !== 200) {
+      throw new Error(`Cloudinary download failed: ${response.statusText}`);
+    }
+
+    tempFilePath = path.join(__dirname, '..', 'Uploads', `temp-${Date.now()}.csv`);
     const writer = fs.createWriteStream(tempFilePath);
+
     response.data.pipe(writer);
 
     await new Promise((resolve, reject) => {
-      writer.on('finish', resolve);
-      writer.on('error', reject);
+      writer.on('finish', () => {
+        console.log(`File downloaded to: ${tempFilePath}`);
+        resolve();
+      });
+      writer.on('error', (err) => {
+        console.error(`Error writing file to ${tempFilePath}:`, err.message);
+        reject(err);
+      });
+      response.data.on('error', (err) => {
+        console.error(`Error streaming data from Cloudinary:`, err.message);
+        reject(err);
+      });
     });
 
-    // Parse existing dataset
+    try {
+      await fsPromises.access(tempFilePath);
+      console.log(`Verified file exists: ${tempFilePath}`);
+    } catch (err) {
+      throw new Error(`Downloaded file not accessible: ${err.message}`);
+    }
+
     const existingData = [];
     await new Promise((resolve, reject) => {
       fs.createReadStream(tempFilePath)
         .pipe(parse({ columns: true }))
         .on('data', (row) => existingData.push(row))
-        .on('end', resolve)
-        .on('error', reject);
+        .on('end', () => {
+          console.log(`Parsed ${existingData.length} rows from existing dataset`);
+          resolve();
+        })
+        .on('error', (err) => {
+          console.error(`Error parsing ${tempFilePath}:`, err.message);
+          reject(err);
+        });
     });
 
-    // Verify column compatibility
     const dummyColumns = Object.keys(dummyData[0] || {});
     const existingColumns = Object.keys(existingData[0] || {});
     if (!dummyColumns.every(col => existingColumns.includes(col))) {
-      await fsPromises.unlink(tempFilePath);
       throw new Error('Column mismatch between dummy data and existing dataset');
     }
 
-    // Append dummy data
     const updatedData = [...existingData, ...dummyData];
-
-    // Write updated CSV
-    const updatedFilePath = path.join('Uploads', `updated-${Date.now()}.csv`);
+    updatedFilePath = path.join(__dirname, '..', 'Uploads', `updated-${Date.now()}.csv`);
     await new Promise((resolve, reject) => {
       stringify(updatedData, { header: true }, (err, output) => {
         if (err) return reject(err);
         fsPromises.writeFile(updatedFilePath, output)
-          .then(resolve)
-          .catch(reject);
+          .then(() => {
+            console.log(`Updated CSV written to: ${updatedFilePath}`);
+            resolve();
+          })
+          .catch((err) => {
+            console.error(`Error writing ${updatedFilePath}:`, err.message);
+            reject(err);
+          });
       });
     });
 
-    // Upload updated CSV to Cloudinary
+    console.log('Uploading updated CSV to Cloudinary...');
     const result = await cloudinary.uploader.upload(updatedFilePath, {
       resource_type: 'raw',
       folder: 'ecommerce-datasets',
@@ -335,28 +387,29 @@ const appendDummyDataToProduct = async (productId, user) => {
       public_id: `ecommerce-datasets/updated-${Date.now()}`
     });
 
-    // Update product with new dataset URL
     product.datasetUrl = result.secure_url;
     await product.save();
-
-    // Clean up temporary files
-    await fsPromises.unlink(tempFilePath);
-    await fsPromises.unlink(updatedFilePath);
 
     return { success: true, datasetUrl: result.secure_url, product };
   } catch (error) {
     console.error(`Error appending dummy data to product ${productId}:`, error.message, error.stack);
-    if (fsPromises.existsSync(tempFilePath)) {
-      await fsPromises.unlink(tempFilePath).catch(err => console.error('Cleanup error:', err.message));
+    if (tempFilePath && fs.existsSync(tempFilePath)) {
+      await fsPromises.unlink(tempFilePath).catch(err => console.error('Cleanup error for temp file:', err.message));
     }
-    if (fsPromises.existsSync(updatedFilePath)) {
-      await fsPromises.unlink(updatedFilePath).catch(err => console.error('Cleanup error:', err.message));
+    if (updatedFilePath && fs.existsSync(updatedFilePath)) {
+      await fsPromises.unlink(updatedFilePath).catch(err => console.error('Cleanup error for updated file:', err.message));
     }
     throw error;
+  } finally {
+    if (tempFilePath && fs.existsSync(tempFilePath)) {
+      await fsPromises.unlink(tempFilePath).catch(err => console.error('Final cleanup error for temp file:', err.message));
+    }
+    if (updatedFilePath && fs.existsSync(updatedFilePath)) {
+      await fsPromises.unlink(updatedFilePath).catch(err => console.error('Final cleanup error for updated file:', err.message));
+    }
   }
 };
 
-// API handler for manual append requests
 const appendDummyData = async (req, res) => {
   const { productId } = req.params;
 
@@ -368,7 +421,10 @@ const appendDummyData = async (req, res) => {
       product: result.product,
     });
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(error.message.includes('Product or dataset not found') ? 404 : 500).json({
+      message: 'Server error',
+      error: error.message
+    });
   }
 };
 

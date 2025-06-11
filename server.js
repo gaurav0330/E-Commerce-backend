@@ -7,8 +7,8 @@ const productRoutes = require('./routes/products');
 const dataRoutes = require('./routes/dummy');
 const cron = require('node-cron');
 const jwt = require('jsonwebtoken');
-const Product = require('./models/Product'); // Adjust path to your Product model
-const { appendDummyData } = require('./controllers/productController'); // Adjust path to your controller
+const Product = require('./models/Product');
+const { appendDummyData } = require('./controllers/productController');
 
 dotenv.config();
 connectDB();
@@ -21,10 +21,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/dummydata', dataRoutes);
 
-
 const generateCronToken = () => {
-
-  const payload = { id: '6830bc44f93ca72fcf59ad92' }; // Adjust to a real user ID
+  const payload = { id: '6830bc44f93ca72fcf59ad92' };
   return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' });
 };
 
@@ -32,9 +30,13 @@ const generateCronToken = () => {
 cron.schedule('*/2 * * * *', async () => {
   console.log('Running dummy data append task every 5 minutes...');
   try {
-    const products = await Product.find({ datasetUrl: { $exists: true, $ne: null } });
+    const userId = '6830bc44f93ca72fcf59ad92';
+    const products = await Product.find({ 
+      user: userId,
+      datasetUrl: { $exists: true, $ne: null, $ne: '' }
+    });
     if (products.length === 0) {
-      console.log('No products with datasetUrl found.');
+      console.log('No valid products with datasetUrl found for user:', userId);
       return;
     }
 
@@ -43,7 +45,7 @@ cron.schedule('*/2 * * * *', async () => {
     for (const product of products) {
       console.log(`Appending dummy data for product: ${product._id}`);
       const req = {
-        params: { productId: product._id },
+        params: { productId: product._id.toString() },
         user: jwt.verify(token, process.env.JWT_SECRET).id,
       };
       const res = {
@@ -54,7 +56,11 @@ cron.schedule('*/2 * * * *', async () => {
         }),
       };
 
-      await appendDummyData(req, res);
+      try {
+        await appendDummyData(req, res);
+      } catch (err) {
+        console.error(`Failed to append dummy data for product ${product._id}:`, err.message);
+      }
     }
     console.log('Dummy data append task completed.');
   } catch (error) {
