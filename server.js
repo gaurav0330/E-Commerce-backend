@@ -43,25 +43,18 @@ cron.schedule('*/2 * * * *', async () => {
     const token = generateCronToken();
 
     for (const product of products) {
-      console.log(`Appending dummy data for product: ${product._id}`);
-      const req = {
-        params: { productId: product._id.toString() },
-        user: jwt.verify(token, process.env.JWT_SECRET).id,
-      };
-      const res = {
-        status: (code) => ({
-          json: (data) => {
-            console.log(`Response for product ${product._id}:`, data);
-          },
-        }),
-      };
-
-      try {
-        await appendDummyData(req, res);
-      } catch (err) {
-        console.error(`Failed to append dummy data for product ${product._id}:`, err.message);
-      }
+  console.log(`Appending dummy data for product: ${product._id}`);
+  try {
+    const result = await appendDummyDataToProduct(product._id.toString(), userId);
+    if (result.success) {
+      console.log(`Success for product ${product._id}:`, result.datasetUrl);
+    } else {
+      console.log(`Skipped product ${product._id}:`, result.message);
     }
+  } catch (err) {
+    console.error(`Failed to process product ${product._id}:`, err.message);
+  }
+}
     console.log('Dummy data append task completed.');
   } catch (error) {
     console.error('Error in dummy data append task:', error.message, error.stack);

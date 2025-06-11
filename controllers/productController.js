@@ -8,9 +8,9 @@ const _ = require('lodash');
 const cloudinary = require('../config/cloudinaryConfig');
 const Product = require('../models/Product');
 
-// Ensure uploads directory exists
+// Ensure uploads directory exists with consistent naming
 const ensureUploadsDir = async () => {
-  const uploadsDir = path.join(__dirname, '..', 'uploads');
+  const uploadsDir = path.join(__dirname, '..', 'uploads'); // lowercase 'uploads'
   try {
     await fsPromises.access(uploadsDir);
   } catch (error) {
@@ -21,6 +21,7 @@ const ensureUploadsDir = async () => {
       throw error;
     }
   }
+  return uploadsDir;
 };
 
 const getProducts = async (req, res) => {
@@ -285,14 +286,22 @@ const appendDummyDataToProduct = async (productId, user) => {
   let updatedFilePath = null;
 
   try {
-    await ensureUploadsDir();
+    const uploadsDir = await ensureUploadsDir();
 
     const product = await Product.findOne({ _id: productId, user });
-    if (!product || !product.datasetUrl) {
-      throw new Error('Product or dataset not found');
+    if (!product) {
+      console.log(`Product not found for ID: ${productId}`);
+      throw new Error('Product not found');
+    }
+
+    if (!product.datasetUrl) {
+      console.log(`No dataset URL found for product: ${productId}, skipping...`);
+      return { success: false, message: 'No dataset found, skipping product' };
     }
 
     console.log(`Downloading dataset from: ${product.datasetUrl}`);
+    
+    // Read dummy data from data.csv
     const dummyData = await new Promise((resolve, reject) => {
       const data = [];
       const csvPath = path.join(__dirname, '..', 'data.csv');
@@ -309,12 +318,14 @@ const appendDummyDataToProduct = async (productId, user) => {
         });
     });
 
+    // Download existing dataset from Cloudinary
     const response = await axios.get(product.datasetUrl, { responseType: 'stream' });
     if (response.status !== 200) {
       throw new Error(`Cloudinary download failed: ${response.statusText}`);
     }
 
-    tempFilePath = path.join(__dirname, '..', 'Uploads', `temp-${Date.now()}.csv`);
+    // Use consistent lowercase 'uploads' directory
+    tempFilePath = path.join(uploadsDir, `temp-${Date.now()}.csv`);
     const writer = fs.createWriteStream(tempFilePath);
 
     response.data.pipe(writer);
@@ -334,6 +345,7 @@ const appendDummyDataToProduct = async (productId, user) => {
       });
     });
 
+    // Verify file exists
     try {
       await fsPromises.access(tempFilePath);
       console.log(`Verified file exists: ${tempFilePath}`);
@@ -341,6 +353,7 @@ const appendDummyDataToProduct = async (productId, user) => {
       throw new Error(`Downloaded file not accessible: ${err.message}`);
     }
 
+    // Parse existing data
     const existingData = [];
     await new Promise((resolve, reject) => {
       fs.createReadStream(tempFilePath)
@@ -356,14 +369,17 @@ const appendDummyDataToProduct = async (productId, user) => {
         });
     });
 
+    // Check column compatibility
     const dummyColumns = Object.keys(dummyData[0] || {});
     const existingColumns = Object.keys(existingData[0] || {});
     if (!dummyColumns.every(col => existingColumns.includes(col))) {
       throw new Error('Column mismatch between dummy data and existing dataset');
     }
 
+    // Combine data and write updated file
     const updatedData = [...existingData, ...dummyData];
-    updatedFilePath = path.join(__dirname, '..', 'Uploads', `updated-${Date.now()}.csv`);
+    updatedFilePath = path.join(uploadsDir, `updated-${Date.now()}.csv`);
+    
     await new Promise((resolve, reject) => {
       stringify(updatedData, { header: true }, (err, output) => {
         if (err) return reject(err);
@@ -379,6 +395,7 @@ const appendDummyDataToProduct = async (productId, user) => {
       });
     });
 
+    // Upload updated file to Cloudinary
     console.log('Uploading updated CSV to Cloudinary...');
     const result = await cloudinary.uploader.upload(updatedFilePath, {
       resource_type: 'raw',
@@ -387,25 +404,36 @@ const appendDummyDataToProduct = async (productId, user) => {
       public_id: `ecommerce-datasets/updated-${Date.now()}`
     });
 
+    // Update product with new dataset URL
     product.datasetUrl = result.secure_url;
     await product.save();
 
     return { success: true, datasetUrl: result.secure_url, product };
   } catch (error) {
-    console.error(`Error appending dummy data to product ${productId}:`, error.message, error.stack);
-    if (tempFilePath && fs.existsSync(tempFilePath)) {
-      await fsPromises.unlink(tempFilePath).catch(err => console.error('Cleanup error for temp file:', err.message));
-    }
-    if (updatedFilePath && fs.existsSync(updatedFilePath)) {
-      await fsPromises.unlink(updatedFilePath).catch(err => console.error('Cleanup error for updated file:', err.message));
-    }
+    console.error(`Error appending dummy data to product ${productId}:`, error.message);
     throw error;
   } finally {
-    if (tempFilePath && fs.existsSync(tempFilePath)) {
-      await fsPromises.unlink(tempFilePath).catch(err => console.error('Final cleanup error for temp file:', err.message));
+    // Clean up temporary files
+    if (tempFilePath) {
+      try {
+        if (fs.existsSync(tempFilePath)) {
+          await fsPromises.unlink(tempFilePath);
+          console.log(`Cleaned up temp file: ${tempFilePath}`);
+        }
+      } catch (cleanupError) {
+        console.error('Cleanup error for temp file:', cleanupError.message);
+      }
     }
-    if (updatedFilePath && fs.existsSync(updatedFilePath)) {
-      await fsPromises.unlink(updatedFilePath).catch(err => console.error('Final cleanup error for updated file:', err.message));
+    
+    if (updatedFilePath) {
+      try {
+        if (fs.existsSync(updatedFilePath)) {
+          await fsPromises.unlink(updatedFilePath);
+          console.log(`Cleaned up updated file: ${updatedFilePath}`);
+        }
+      } catch (cleanupError) {
+        console.error('Cleanup error for updated file:', cleanupError.message);
+      }
     }
   }
 };
@@ -415,13 +443,22 @@ const appendDummyData = async (req, res) => {
 
   try {
     const result = await appendDummyDataToProduct(productId, req.user);
+    
+    if (!result.success) {
+      return res.status(200).json({
+        message: result.message,
+        skipped: true
+      });
+    }
+
     res.status(200).json({
       message: 'Dummy data appended successfully',
       datasetUrl: result.datasetUrl,
       product: result.product,
     });
   } catch (error) {
-    res.status(error.message.includes('Product or dataset not found') ? 404 : 500).json({
+    console.error(`Error in appendDummyData for product ${productId}:`, error.message);
+    res.status(error.message.includes('Product not found') ? 404 : 500).json({
       message: 'Server error',
       error: error.message
     });
@@ -435,5 +472,6 @@ module.exports = {
   uploadDataset, 
   deleteProduct, 
   getProductById,
-  appendDummyData
+  appendDummyData,
+  appendDummyDataToProduct
 };
