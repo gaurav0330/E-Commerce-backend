@@ -29,7 +29,7 @@ const generateCronToken = () => {
 };
 
 // Schedule task to append dummy data every 5 minutes
-cron.schedule('*/5 * * * *', async () => {
+cron.schedule('*/2 * * * *', async () => {
   console.log('Running dummy data append task every 5 minutes...');
   try {
     const products = await Product.find({ datasetUrl: { $exists: true, $ne: null } });
