@@ -266,20 +266,18 @@ const uploadDataset = async (req, res) => {
   }
 };
 
-const appendDummyData = async (req, res) => {
-  const { productId } = req.params;
-
+const appendDummyDataToProduct = async (productId, user) => {
   try {
     // Find the product
-    const product = await Product.findOne({ _id: productId, user: req.user });
+    const product = await Product.findOne({ _id: productId, user });
     if (!product || !product.datasetUrl) {
-      return res.status(404).json({ message: 'Product or dataset not found' });
+      throw new Error('Product or dataset not found');
     }
 
     // Get 10 random records from dummy data
     const dummyData = await new Promise((resolve, reject) => {
       const data = [];
-      fs.createReadStream('./data.csv') // Use standard fs module
+      fs.createReadStream('./data.csv')
         .pipe(parse({ columns: true }))
         .on('data', (row) => data.push(row))
         .on('end', () => resolve(_.sampleSize(data, 10)))
@@ -289,7 +287,7 @@ const appendDummyData = async (req, res) => {
     // Download existing dataset from Cloudinary
     const response = await axios.get(product.datasetUrl, { responseType: 'stream' });
     const tempFilePath = path.join('uploads', `temp-${Date.now()}.csv`);
-    const writer = fs.createWriteStream(tempFilePath); // Use standard fs module
+    const writer = fs.createWriteStream(tempFilePath);
     response.data.pipe(writer);
 
     await new Promise((resolve, reject) => {
@@ -300,7 +298,7 @@ const appendDummyData = async (req, res) => {
     // Parse existing dataset
     const existingData = [];
     await new Promise((resolve, reject) => {
-      fs.createReadStream(tempFilePath) // Use standard fs module
+      fs.createReadStream(tempFilePath)
         .pipe(parse({ columns: true }))
         .on('data', (row) => existingData.push(row))
         .on('end', resolve)
@@ -312,14 +310,14 @@ const appendDummyData = async (req, res) => {
     const existingColumns = Object.keys(existingData[0] || {});
     if (!dummyColumns.every(col => existingColumns.includes(col))) {
       await fsPromises.unlink(tempFilePath);
-      return res.status(400).json({ message: 'Column mismatch between dummy data and existing dataset' });
+      throw new Error('Column mismatch between dummy data and existing dataset');
     }
 
     // Append dummy data
     const updatedData = [...existingData, ...dummyData];
 
     // Write updated CSV
-    const updatedFilePath = path.join('uploads', `updated-${Date.now()}.csv`);
+    const updatedFilePath = path.join('Uploads', `updated-${Date.now()}.csv`);
     await new Promise((resolve, reject) => {
       stringify(updatedData, { header: true }, (err, output) => {
         if (err) return reject(err);
@@ -345,19 +343,31 @@ const appendDummyData = async (req, res) => {
     await fsPromises.unlink(tempFilePath);
     await fsPromises.unlink(updatedFilePath);
 
-    res.status(200).json({
-      message: 'Dummy data appended successfully',
-      datasetUrl: result.secure_url,
-      product,
-    });
+    return { success: true, datasetUrl: result.secure_url, product };
   } catch (error) {
-    console.error('Append Dummy Data Error:', error.message, error.stack);
+    console.error(`Error appending dummy data to product ${productId}:`, error.message, error.stack);
     if (fsPromises.existsSync(tempFilePath)) {
       await fsPromises.unlink(tempFilePath).catch(err => console.error('Cleanup error:', err.message));
     }
     if (fsPromises.existsSync(updatedFilePath)) {
       await fsPromises.unlink(updatedFilePath).catch(err => console.error('Cleanup error:', err.message));
     }
+    throw error;
+  }
+};
+
+// API handler for manual append requests
+const appendDummyData = async (req, res) => {
+  const { productId } = req.params;
+
+  try {
+    const result = await appendDummyDataToProduct(productId, req.user);
+    res.status(200).json({
+      message: 'Dummy data appended successfully',
+      datasetUrl: result.datasetUrl,
+      product: result.product,
+    });
+  } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
