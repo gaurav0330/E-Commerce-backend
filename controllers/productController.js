@@ -10,7 +10,7 @@ const Product = require('../models/Product');
 
 // Ensure uploads directory exists with consistent naming
 const ensureUploadsDir = async () => {
-  const uploadsDir = path.join(__dirname, '..', 'uploads'); // lowercase 'uploads'
+  const uploadsDir = path.join(__dirname, '..', 'uploads');
   try {
     await fsPromises.access(uploadsDir);
   } catch (error) {
@@ -51,7 +51,7 @@ const getProductById = async (req, res) => {
 
 
 const addProduct = async (req, res) => {
-  const { product_name, category, subCategory, price, stock, description, brand } = req.body;
+  const { product_name, category, subCategory, price, stock, description } = req.body;
 
   try {
     if (!product_name || !category || !price || stock === undefined) {
@@ -65,7 +65,6 @@ const addProduct = async (req, res) => {
       price,
       stock,
       description,
-      brand,
       user: req.user,
     };
 
@@ -137,7 +136,6 @@ const updateProduct = async (req, res) => {
     stock,
     description,
     imageUrl,
-    brand,
     ratings,
     Dataset,
     datasetUrl,
@@ -145,7 +143,6 @@ const updateProduct = async (req, res) => {
     promotion,
     historical_data,
     seasonal_trends,
-    economic_indicators,
     competitor_analysis,
     predictions,
   } = req.body;
@@ -168,7 +165,6 @@ const updateProduct = async (req, res) => {
     if (stock !== undefined) product.stock = stock;
     if (description !== undefined) product.description = description;
     if (imageUrl !== undefined) product.imageUrl = imageUrl;
-    if (brand !== undefined) product.brand = brand;
     if (ratings !== undefined) product.ratings = ratings;
     if (Dataset !== undefined) {
       product.Dataset = Dataset;
@@ -179,7 +175,6 @@ const updateProduct = async (req, res) => {
     if (promotion !== undefined) product.promotion = promotion;
     if (historical_data !== undefined) product.historical_data = historical_data;
     if (seasonal_trends !== undefined) product.seasonal_trends = seasonal_trends;
-    if (economic_indicators !== undefined) product.economic_indicators = economic_indicators;
     if (competitor_analysis !== undefined) product.competitor_analysis = competitor_analysis;
     if (predictions !== undefined) product.predictions = predictions;
 

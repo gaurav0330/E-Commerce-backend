@@ -9,6 +9,7 @@ const cron = require('node-cron');
 const jwt = require('jsonwebtoken');
 const Product = require('./models/Product');
 const { appendDummyDataToProduct } = require('./controllers/productController'); // Import the direct function
+const economicIndicatorRoutes = require('./routes/economicIndicatorRoutes');
 
 dotenv.config();
 connectDB();
@@ -20,6 +21,7 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/dummydata', dataRoutes);
+app.use('/api/economic-indicators', economicIndicatorRoutes);
 
 const generateCronToken = () => {
   const payload = { id: '6830bc44f93ca72fcf59ad92' };

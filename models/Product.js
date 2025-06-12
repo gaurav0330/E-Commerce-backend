@@ -48,10 +48,6 @@ const productSchema = new mongoose.Schema({
     required: false,
     default: '',
   },
-  brand: {
-    type: String,
-    required: false,
-  },
   ratings: {
     average: {
       type: Number,
@@ -137,36 +133,6 @@ const productSchema = new mongoose.Schema({
   },
   seasonal_trends: {
     highest_demand_months: {
-      '2018': [Number],
-      '2019': [Number],
-    },
-  },
-  economic_indicators: {
-    gdp: {
-      '2018': [Number],
-      '2019': [Number],
-    },
-    unemployment_rate: {
-      '2018': [Number],
-      '2019': [Number],
-    },
-    inflation_rate: {
-      '2018': [Number],
-      '2019': [Number],
-    },
-    consumer_confidence_index: {
-      '2018': [Number],
-      '2019': [Number],
-    },
-    interest_rate: {
-      '2018': [Number],
-      '2019': [Number],
-    },
-    exchange_rate: {
-      '2018': [Number],
-      '2019': [Number],
-    },
-    stock_market_index: {
       '2018': [Number],
       '2019': [Number],
     },
