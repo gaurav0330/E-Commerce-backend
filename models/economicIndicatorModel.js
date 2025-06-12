@@ -2,37 +2,45 @@ const mongoose = require('mongoose');
 
 const indicatorSchema = new mongoose.Schema({
   gdp: {
-    '2018': [Number],
-    '2019': [Number],
+    type: Map,
+    of: [Number],
+    default: {},
   },
   unemployment_rate: {
-    '2018': [Number],
-    '2019': [Number],
+    type: Map,
+    of: [Number],
+    default: {},
   },
   inflation_rate: {
-    '2018': [Number],
-    '2019': [Number],
+    type: Map,
+    of: [Number],
+    default: {},
   },
   consumer_confidence_index: {
-    '2018': [Number],
-    '2019': [Number],
+    type: Map,
+    of: [Number],
+    default: {},
   },
   interest_rate: {
-    '2018': [Number],
-    '2019': [Number],
+    type: Map,
+    of: [Number],
+    default: {},
   },
   exchange_rate: {
-    '2018': [Number],
-    '2019': [Number],
+    type: Map,
+    of: [Number],
+    default: {},
   },
   stock_market_index: {
-    '2018': [Number],
-    '2019': [Number],
+    type: Map,
+    of: [Number],
+    default: {},
   },
   createdAt: {
     type: Date,
     default: Date.now,
   },
 });
+
 
 module.exports = mongoose.model('EconomicIndicator', indicatorSchema);
