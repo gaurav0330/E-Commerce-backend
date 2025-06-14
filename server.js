@@ -10,7 +10,7 @@ const jwt = require('jsonwebtoken');
 const Product = require('./models/Product');
 const { appendDummyDataToProduct } = require('./controllers/productController'); // Import the direct function
 const economicIndicatorRoutes = require('./routes/economicIndicatorRoutes');
-
+const inventoryRoutes = require('./routes/inventoryRoutes');
 dotenv.config();
 connectDB();
 
@@ -22,6 +22,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/dummydata', dataRoutes);
 app.use('/api/economic-indicators', economicIndicatorRoutes);
+app.use('/api/inventory', inventoryRoutes);
 
 const generateCronToken = () => {
   const payload = { id: '6830bc44f93ca72fcf59ad92' };

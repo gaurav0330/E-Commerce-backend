@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
 const registerUser = async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, companyName } = req.body;
 
   try {
     let user = await User.findOne({ email });
@@ -17,6 +17,7 @@ const registerUser = async (req, res) => {
     user = new User({
       email,
       password: hashedPassword,
+      companyName, // 👈 Add this line
     });
 
     await user.save();
@@ -53,4 +54,13 @@ const loginUser = async (req, res) => {
   }
 };
 
-module.exports = { registerUser, loginUser };
+const getAllUsers = async (req, res) => {
+  try {
+    const users = await User.find().select('-password'); // exclude password
+    res.json(users);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error while fetching users' });
+  }
+};
+
+module.exports = { registerUser, loginUser, getAllUsers };
