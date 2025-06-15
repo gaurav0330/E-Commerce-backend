@@ -30,6 +30,21 @@ const saveForecast = async (req, res) => {
   try {
     const { productId, prediction } = req.body;
 
+    // Validate productId
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      return res.status(400).json({ message: 'Invalid productId' });
+    }
+
+    // Validate prediction data
+    if (!prediction || !Array.isArray(prediction.prediction) || prediction.prediction.length !== 365) {
+      return res.status(400).json({ message: 'Prediction data must be an array of 365 numbers' });
+    }
+
+    // Validate startDate
+    if (!prediction.startDate || isNaN(new Date(prediction.startDate))) {
+      return res.status(400).json({ message: 'Invalid startDate' });
+    }
+
     const input = await InventoryInput.findOne({ productId });
     if (!input) {
       return res.status(400).json({ message: 'No inventory input found for this product' });
@@ -46,7 +61,7 @@ const saveForecast = async (req, res) => {
     const existing = await InventoryForecast.findOne({ productId });
     if (existing) {
       existing.predictionData = prediction.prediction;
-      existing.startDate = prediction.startDate;
+      existing.startDate = new Date(prediction.startDate);
       existing.stockStatus = stockStatus;
       await existing.save();
       return res.status(200).json({ message: 'Forecast updated', stockStatus });
@@ -55,20 +70,19 @@ const saveForecast = async (req, res) => {
     const forecast = new InventoryForecast({
       productId,
       predictionData: prediction.prediction,
-      startDate: prediction.startDate,
+      startDate: new Date(prediction.startDate),
       stockStatus,
     });
 
     await forecast.save();
     res.status(201).json({ message: 'Forecast saved', stockStatus });
   } catch (error) {
-    console.error('Error saving forecast:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.error('Error saving forecast:', error.message, error.stack);
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
 
-// 3️⃣ Get Inventory + Forecast Report
-// 3️⃣ Get Inventory + Forecast Report (with shortage info)
+
 const getInventoryReport = async (req, res) => {
   try {
     const { productId } = req.params;
