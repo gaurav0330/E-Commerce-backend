@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
 const InventoryInput = require('../models/inventory');
 const InventoryForecast = require('../models/InventoryForecast');
+const { sendEmail } = require('../services/emailServices');
+const User = require('../models/User');
 
 const submitInventoryInput = async (req, res) => {
   try {
@@ -57,6 +59,16 @@ const saveForecast = async (req, res) => {
       stockStatus = input.stockQuantity >= input.reorderThreshold ? 'Low Stock' : 'Out of Stock';
     }
 
+    // Send low stock email if applicable
+    if (stockStatus === 'Low Stock' || stockStatus === 'Out of Stock') {
+      // Find admin users to notify (adjust based on your User model)
+      const admins = await User.find({ role: 'Admin' }).select('email username');
+      for (const admin of admins) {
+        const message = `Dear ${admin.username || admin.email},\n\nThe inventory for product ID ${productId} is ${stockStatus === 'Low Stock' ? 'running low' : 'out of stock'}. Current stock: ${input.stockQuantity}, Predicted 30-day demand: ${predictedSalesSum.toFixed(2)}.\n\nPlease restock soon to avoid disruptions.\n\nBest,\nE-Commerce Team`;
+        await sendEmail(admin.email, `Inventory Alert: Product ${stockStatus}`, message);
+      }
+    }
+
     const existing = await InventoryForecast.findOne({ productId });
     if (existing) {
       existing.predictionData = prediction.prediction;
@@ -70,7 +82,7 @@ const saveForecast = async (req, res) => {
       productId,
       predictionData: prediction.prediction,
       startDate: new Date(prediction.startDate),
-      stockStatus,
+      stockStatus
     });
 
     await forecast.save();
@@ -170,7 +182,7 @@ const getInventoryReport = async (req, res) => {
         : null,
       forecast: forecast
         ? {
-            predictionData: forecast.predictionData.slice(0, 30), // Limit to 30 days for brevity
+            predictionData: forecast.predictionData.slice(0, 30),
             startDate: forecast.startDate,
             stockStatus: forecast.stockStatus,
             createdAt: forecast.createdAt
