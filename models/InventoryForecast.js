@@ -8,7 +8,7 @@ const inventoryForecastSchema = new mongoose.Schema({
     unique: true
   },
   predictionData: {
-    type: [Number], // 365-day prediction
+    type: [Number], 
     required: true
   },
   startDate: {

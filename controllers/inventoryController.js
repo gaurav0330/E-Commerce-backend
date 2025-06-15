@@ -37,7 +37,7 @@ const saveForecast = async (req, res) => {
     }
 
     // Validate prediction data
-    if (!prediction || !Array.isArray(prediction.prediction) || prediction.prediction.length !== 365) {
+    if (!prediction || !Array.isArray(prediction.prediction)) {
       return res.status(400).json({ message: 'Prediction data must be an array of 365 numbers' });
     }
 
