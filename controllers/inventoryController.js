@@ -1,7 +1,7 @@
+const mongoose = require('mongoose');
 const InventoryInput = require('../models/inventory');
 const InventoryForecast = require('../models/InventoryForecast');
 
-// 1️⃣ Submit Inventory
 const submitInventoryInput = async (req, res) => {
   try {
     const { productId, stockQuantity, reorderThreshold = 20 } = req.body;
@@ -25,7 +25,6 @@ const submitInventoryInput = async (req, res) => {
   }
 };
 
-// 2️⃣ Save Prediction
 const saveForecast = async (req, res) => {
   try {
     const { productId, prediction } = req.body;
@@ -82,45 +81,117 @@ const saveForecast = async (req, res) => {
   }
 };
 
+const getInventoryInput = async (req, res) => {
+  try {
+    const { productId } = req.params;
+
+    // Validate productId
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      return res.status(400).json({ message: 'Invalid productId' });
+    }
+
+    const inventoryInput = await InventoryInput.findOne({ productId }).lean();
+    if (!inventoryInput) {
+      return res.status(404).json({ message: 'Inventory input not found for this product' });
+    }
+
+    res.status(200).json({
+      message: 'Inventory input retrieved',
+      data: {
+        productId: inventoryInput.productId,
+        stockQuantity: inventoryInput.stockQuantity,
+        reorderThreshold: inventoryInput.reorderThreshold
+      }
+    });
+  } catch (error) {
+    console.error('Error retrieving inventory input:', error.message, error.stack);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+const getForecast = async (req, res) => {
+  try {
+    const { productId } = req.params;
+
+    // Validate productId
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      return res.status(400).json({ message: 'Invalid productId' });
+    }
+
+    const forecast = await InventoryForecast.findOne({ productId }).lean();
+    if (!forecast) {
+      return res.status(404).json({ message: 'Forecast not found for this product' });
+    }
+
+    res.status(200).json({
+      message: 'Forecast retrieved',
+      data: {
+        productId: forecast.productId,
+        predictionData: forecast.predictionData,
+        startDate: forecast.startDate,
+        stockStatus: forecast.stockStatus,
+        createdAt: forecast.createdAt
+      }
+    });
+  } catch (error) {
+    console.error('Error retrieving forecast:', error.message, error.stack);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
 
 const getInventoryReport = async (req, res) => {
   try {
     const { productId } = req.params;
 
-    const inventory = await InventoryInput.findOne({ productId });
-    const forecast = await InventoryForecast.findOne({ productId });
-
-    if (!inventory || !forecast) {
-      return res.status(404).json({ message: 'Data not found for this product' });
+    // Validate productId
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      return res.status(400).json({ message: 'Invalid productId' });
     }
 
-    const predicted30Days = forecast.predictionData.slice(0, 30);
-    const predictedSalesSum = predicted30Days.reduce((sum, val) => sum + val, 0);
+    // Fetch both InventoryInput and InventoryForecast
+    const [inventoryInput, forecast] = await Promise.all([
+      InventoryInput.findOne({ productId }).lean(),
+      InventoryForecast.findOne({ productId }).lean()
+    ]);
 
-    const shortage = Math.max(predictedSalesSum - inventory.stockQuantity, 0);
+    // Check if at least one document exists
+    if (!inventoryInput && !forecast) {
+      return res.status(404).json({ message: 'No inventory input or forecast found for this product' });
+    }
 
-    res.json({
+    // Build the response
+    const report = {
       productId,
-      stockQuantity: inventory.stockQuantity,
-      reorderThreshold: inventory.reorderThreshold,
-      startDate: forecast.startDate,
-      prediction: predicted30Days,
-      stockStatus: forecast.stockStatus,
-      predicted30DayDemand: predictedSalesSum,
-      shortage: shortage > 0 ? shortage : 0,
-      message: shortage > 0
-        ? `You are short by ${shortage} units to meet 30 days demand.`
-        : 'Current stock is sufficient for the next 30 days.'
+      inventory: inventoryInput
+        ? {
+            stockQuantity: inventoryInput.stockQuantity,
+            reorderThreshold: inventoryInput.reorderThreshold
+          }
+        : null,
+      forecast: forecast
+        ? {
+            predictionData: forecast.predictionData.slice(0, 30), // Limit to 30 days for brevity
+            startDate: forecast.startDate,
+            stockStatus: forecast.stockStatus,
+            createdAt: forecast.createdAt
+          }
+        : null
+    };
+
+    res.status(200).json({
+      message: 'Inventory report retrieved',
+      data: report
     });
   } catch (error) {
-    console.error('Error fetching report:', error);
-    res.status(500).json({ message: 'Server error' });
+    console.error('Error retrieving inventory report:', error.message, error.stack);
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
-
 
 module.exports = {
   submitInventoryInput,
   saveForecast,
+  getInventoryInput,
+  getForecast,
   getInventoryReport
 };
