@@ -11,7 +11,15 @@ const inventoryForecastSchema = new mongoose.Schema({
     type: [Number], 
     required: true
   },
+  analysis: {
+    type: String,
+    required: true
+  },
   startDate: {
+    type: Date,
+    required: true
+  },
+  endDate: {
     type: Date,
     required: true
   },
@@ -20,10 +28,15 @@ const inventoryForecastSchema = new mongoose.Schema({
     enum: ['Sufficient', 'Low Stock', 'Out of Stock'],
     required: true
   },
+  monthlyAggregates: {
+    type: [Number], // 12 months
+    default: []
+  },
   createdAt: {
     type: Date,
     default: Date.now
   }
 });
+
 
 module.exports = mongoose.model('InventoryForecast', inventoryForecastSchema);
