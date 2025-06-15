@@ -31,21 +31,7 @@ const saveForecast = async (req, res) => {
   try {
     const { productId, prediction } = req.body;
 
-    // Validate productId
-    if (!mongoose.Types.ObjectId.isValid(productId)) {
-      return res.status(400).json({ message: 'Invalid productId' });
-    }
-
-    // Validate prediction data
-    if (!prediction || !Array.isArray(prediction.prediction)) {
-      return res.status(400).json({ message: 'Prediction data must be an array of 365 numbers' });
-    }
-
-    // Validate startDate
-    if (!prediction.startDate || isNaN(new Date(prediction.startDate))) {
-      return res.status(400).json({ message: 'Invalid startDate' });
-    }
-
+    
     const input = await InventoryInput.findOne({ productId });
     if (!input) {
       return res.status(400).json({ message: 'No inventory input found for this product' });
