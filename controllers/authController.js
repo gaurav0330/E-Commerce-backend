@@ -4,7 +4,7 @@ const User = require('../models/User');
 const { sendEmail, sendLoginEmail } = require('../services/emailServices');
 
 const registerUser = async (req, res) => {
-  const { email, password, companyName, username } = req.body;
+  const { email, password, companyName } = req.body;
 
   try {
     let user = await User.findOne({ email });
@@ -19,7 +19,7 @@ const registerUser = async (req, res) => {
       email,
       password: hashedPassword,
       companyName,
-      username: username || email.split('@')[0]
+      username: companyName || email.split('@')[0]
     });
 
     await user.save();
